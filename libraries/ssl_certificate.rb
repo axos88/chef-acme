@@ -146,8 +146,6 @@ class Chef
                 fail "Unknown output type: #{new_resource.output}"
               end
 
-              key_data = @current_key
-
               file new_resource.path do
                 content cert_data
 

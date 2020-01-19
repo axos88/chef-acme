@@ -25,6 +25,10 @@ action :create do
     fail "[#{new_resource.cn}] No valid certificate output specified, only one of the crt/fullchain propery is permitted and required"
   end
 
+  if new_resource.fullchain.nil? && new_resource.chain.nil?
+    fail "[#{new_resource.cn}] No valid chain output specified, a chain is required when outputting a cert"
+  end
+
   if new_resource.key.nil?
     fail "[#{new_resource.cn}] No valid key output specified, the key propery is required"
   end
@@ -34,7 +38,7 @@ action :create do
     owner     new_resource.owner
     group     new_resource.group
     mode      00400
-    content   OpenSSL::PKey::RSA.new(2048).to_pem
+    content   OpenSSL::PKey::RSA.new(new_resource.key_size).to_pem
     sensitive true
     action    :nothing
   end.run_action(:create_if_missing)
@@ -55,45 +59,34 @@ action :create do
 
       case authz.status
       when 'valid'
-        case new_resource.method
-        when 'http'
-          authz.http01
-        else
-          fail "[#{new_resource.cn}] Invalid validation method '#{new_resource.method}'"
-        end
+        authz.http01
       when 'pending'
-        case new_resource.method
-        when 'http'
-          tokenpath = "#{new_resource.wwwroot}/#{authz.http01.filename}"
+        tokenpath = "#{new_resource.wwwroot}/#{authz.http01.filename}"
 
-          tokenroot = directory ::File.dirname(tokenpath) do
-            owner     new_resource.owner
-            group     new_resource.group
-            mode      00755
-            recursive true
-          end
-
-          auth_file = file tokenpath do
-            owner   new_resource.owner
-            group   new_resource.group
-            mode    00644
-            content authz.http01.file_content
-          end
-          validation = acme_validate_immediately(authz, 'http01', tokenroot, auth_file)
-
-          if validation.status != 'valid'
-            fail "[#{new_resource.cn}] Validation failed for domain #{authz.domain}"
-          end
-
-          validation
-
-        else
-          fail "[#{new_resource.cn}] Invalid validation method '#{new_resource.method}'"
+        tokenroot = directory ::File.dirname(tokenpath) do
+          owner     new_resource.owner
+          group     new_resource.group
+          mode      00755
+          recursive true
         end
+
+        auth_file = file tokenpath do
+          owner   new_resource.owner
+          group   new_resource.group
+          mode    00644
+          content authz.http01.file_content
+        end
+        validation = acme_validate_immediately(authz, 'http01', tokenroot, auth_file)
+
+        if validation.status != 'valid'
+          fail "[#{new_resource.cn}] Validation failed for domain #{authz.domain} with error #{validation.error}"
+        end
+
+        validation
       end
     end
 
-    ruby_block "create certificate for #{new_resource.cn}" do
+    ruby_block "refresh certificate for #{new_resource.cn}" do
       block do
         if (all_validations.map { |authz| authz.status == 'valid' }).all?
           begin
@@ -109,14 +102,16 @@ action :create do
               f.mode    00644
             end.run_action :create
 
-            Chef::Resource::File.new("#{new_resource.cn} SSL new chain", run_context).tap do |f|
-              f.path    new_resource.chain
-              f.owner   new_resource.owner
-              f.group   new_resource.group
-              f.content newcert.chain_to_pem
-              f.not_if  { new_resource.chain.nil? }
-              f.mode    00644
-            end.run_action :create
+            if new_resource.chain
+              Chef::Resource::File.new("#{new_resource.cn} SSL new chain", run_context).tap do |f|
+                f.path    new_resource.chain
+                f.owner   new_resource.owner
+                f.group   new_resource.group
+                f.content newcert.chain_to_pem
+                f.not_if  { new_resource.chain.nil? }
+                f.mode    00644
+              end.run_action :create
+            end
           end
         else
           fail "[#{new_resource.cn}] Validation failed, unable to request certificate"

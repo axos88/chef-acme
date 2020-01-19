@@ -24,12 +24,10 @@ file 'hosts' do
   content "127.0.0.1\tlocalhost boulder boulder-rabbitmq boulder-mysql test.example.com new.example.com web.example.com mail.example.com"
 end
 
-chef_gem 'chef-rewind'
-require 'chef/rewind'
-
 include_recipe 'letsencrypt-boulder-server'
 
 # awaiting https://github.com/customink-webops/hostsfile/pull/78
-rewind hostsfile_entry: '127.0.0.1' do
+# edit_resource is a chef 12.10/compat_resource feature
+edit_resource(:hostsfile_entry, '127.0.0.1') do
   action :nothing
 end

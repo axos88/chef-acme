@@ -33,5 +33,9 @@ attribute :fullchain,     :kind_of => String, :default => nil
 attribute :owner,         :kind_of => String, :default => 'root'
 attribute :group,         :kind_of => String, :default => 'root'
 
-attribute :method,        :kind_of => String, :default => 'http'
 attribute :wwwroot,       :kind_of => String, :default => '/var/www'
+
+attribute :key_size,      :kind_of  => Integer,
+                               :default  => node['acme']['key_size'],
+                               :equal_to => [2048, 3072, 4096],
+                               :required => true

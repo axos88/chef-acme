@@ -15,6 +15,7 @@ Attributes
 * `node['acme']['renew']` - Days before the certificate expires at which the certificate will be renewed, default `30`.
 * `node['acme']['source_ips']` - IP addresses used by Let's Encrypt to verify the TLS certificates, it will change over time. This attribute is for firewall purposes. Allow these IPs for HTTP (tcp/80).
 * `node['acme']['private_key']` - Private key content of registered account.
+* `node['acme']['key_size']` - Default private key size used when resource property is not. Must be one out of: 2048, 3072, 4096. Defaults to 2048.
 
 Recipes
 -------
@@ -23,46 +24,62 @@ Installs the required acme-client rubygem.
 
 Usage
 -----
-Use the `acme_certificate` provider to request a certificate. The webserver for the domain for which you are requesting a certificate must be running on the local server. Currently only the http validation method is supported. Provide the path to your `wwwroot` for the specified domain.
+Use the `acme_certificate` resource to request a certificate with the http-01 challange. The webserver for the domain for which you are requesting a certificate must be running on the local server. This resource only supports the http validation method. To use the tls-sni-01 challange, please see the resource below. Provide the path to your `wwwroot` for the specified domain.
 
 ```ruby
 acme_certificate 'test.example.com' do
-  crt      '/etc/ssl/test.example.com.crt'
-  key      '/etc/ssl/test.example.com.key'
-  method   'http'
-  wwwroot  '/var/www'
+  crt               '/etc/ssl/test.example.com.crt'
+  chain             '/etc/ssl/test.example.com-chain.crt'
+  key               '/etc/ssl/test.example.com.key'
+  wwwroot           '/var/www'
 end
 ```
 
-In case your webserver needs an already existing certificate when installing a new server you will have a bootstrap problem. Webserver cannot start without certificate, but the certificate cannot be requested without the running webserver. To overcome this a self-signed certificate can be generated with the `acme_selfsigned` provider.
+Use the `acme_ssl_certificate` resource to request a certificate using the tls-sni-01 challange. By default an nginx server is expected to be running on the machine that will be configured to complete the challange. Using a differnet webserver is possible by specifying a different provider for the resource, but by default only the nginx provider is implemented (see libraries/ssl_certificate/nginx.rb on how to port the resource for another webserver).
+
+```ruby
+acme_ssl_certificate '/etc/ssl/test.example.com.crt' do
+  cn                'test.example.com'
+  alt_names         ['foo.example.com', 'bar.example.com']
+  output            :crt # or :fullchain
+  key               '/etc/ssl/private/test.example.key.pem'
+  min_validity      30 #Renew certificate if expiry is closed than this many days
+
+  webserver         :nginx
+end
+```
+
+In case your webserver needs an already existing certificate when installing a new server you will have a bootstrap problem. Webserver cannot start without certificate, but the certificate cannot be requested without the running webserver. To overcome this a self-signed certificate can be generated with the `acme_selfsigned` resource.
 
 ```ruby
 acme_selfsigned 'test.example.com' do
   crt     '/etc/ssl/test.example.com.crt'
+  chain   '/etc/ssl/test.example.com-chain.crt'
   key     '/etc/ssl/test.example.com.key'
 end
 ```
+
 
 A working example can be found in the included `acme_client` test cookbook.
 
 Providers
 ---------
 ### certificate
-| Property         | Type    | Default  | Description                                            |
-|  ---             |  ---    |  ---     |  ---                                                   |
-| `cn`             | string  | _name_   | The common name for the certificate                    |
-| `alt_names`      | array   | []       | The common name for the certificate                    |
-| `crt`            | string  | nil      | File path to place the certificate                     |
-| `key`            | string  | nil      | File path to place the private key                     |
-| `chain`          | string  | nil      | File path to place the certificate chain               |
-| `fullchain`      | string  | nil      | File path to place the certificate including the chain |
-| `owner`          | string  | root     | Owner of the created files                             |
-| `group`          | string  | root     | Group of the created files                             |
-| `method`         | string  | http     | Validation method                                      |
-| `wwwroot`        | string  | /var/www | Path to the wwwroot of the domain                      |
-| `ignore_failure` | boolean | false    | Whether to continue chef run if issuance fails         |
-| `retries`        | integer | 0        | Number of times to catch exceptions and retry          |
-| `retry_delay`    | integer | 2        | Number of seconds to wait between retries              |
+| Property            | Type    | Default  | Description                                            |
+|  ---                |  ---    |  ---     |  ---                                                   |
+| `cn`                | string  | _name_   | The common name for the certificate                    |
+| `alt_names`         | array   | []       | The common name for the certificate                    |
+| `crt`               | string  | nil      | File path to place the certificate                     |
+| `key`               | string  | nil      | File path to place the private key                     |
+| `key_size`          | integer | 2048     | Private key size. Must be one out of: 2048, 3072, 4096 |
+| `chain`             | string  | nil      | File path to place the certificate chain               |
+| `fullchain`         | string  | nil      | File path to place the certificate including the chain |
+| `owner`             | string  | root     | Owner of the created files                             |
+| `group`             | string  | root     | Group of the created files                             |
+| `wwwroot`           | string  | /var/www | Path to the wwwroot of the domain                      |
+| `ignore_failure`    | boolean | false    | Whether to continue chef run if issuance fails         |
+| `retries`           | integer | 0        | Number of times to catch exceptions and retry          |
+| `retry_delay`       | integer | 2        | Number of seconds to wait between retries              |
 
 ### selfsigned
 | Property         | Type    | Default  | Description                                            |
@@ -70,6 +87,7 @@ Providers
 | `cn`             | string  | _name_   | The common name for the certificate                    |
 | `crt`            | string  | nil      | File path to place the certificate                     |
 | `key`            | string  | nil      | File path to place the private key                     |
+| `key_size`       | integer | 2048     | Private key size. Must be one out of: 2048, 3072, 4096 |
 | `chain`          | string  | nil      | File path to place the certificate chain               |
 | `owner`          | string  | root     | Owner of the created files                             |
 | `group`          | string  | root     | Group of the created files                             |
@@ -83,9 +101,9 @@ To generate a certificate for an apache2 website you can use code like this:
 include_recipe 'acme'
 
 # Set up contact information. Note the mailto: notation
-node.set['acme']['contact'] = ['mailto:me@example.com'] 
+node.set['acme']['contact'] = ['mailto:me@example.com']
 # Real certificates please...
-node.set['acme']['endpoint'] = 'https://acme-v01.api.letsencrypt.org' 
+node.set['acme']['endpoint'] = 'https://acme-v01.api.letsencrypt.org'
 
 site = "example.com"
 sans = ["www.#{site}"]
@@ -104,11 +122,10 @@ end
 
 # Get and auto-renew the certificate from Let's Encrypt
 acme_certificate "#{site}" do
-  crt      "/etc/httpd/ssl/#{site}.crt"
-  key      "/etc/httpd/ssl/#{site}.key"
-  chain    "/etc/httpd/ssl/#{site}.pem"
-  method   "http"
-  wwwroot  "/var/www/#{site}/htdocs/"
+  crt               "/etc/httpd/ssl/#{site}.crt"
+  key               "/etc/httpd/ssl/#{site}.key"
+  chain             "/etc/httpd/ssl/#{site}.pem"
+  wwwroot           "/var/www/#{site}/htdocs/"
   notifies :restart, "service[apache2]"
   alt_names sans
 end
