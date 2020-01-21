@@ -19,7 +19,7 @@
 #
 
 # Install a webserver
-include_recipe 'chef_nginx'
+include_recipe 'nginx'
 
 nginx_site 'test' do
   template 'nginx-test.conf'
