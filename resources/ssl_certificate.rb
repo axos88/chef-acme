@@ -25,16 +25,12 @@ attribute :cn,                  :kind_of => String, :required => true
 attribute :alt_names,           :kind_of => Array,  :default => []
 
 attribute :path,                :kind_of => String, :name_attribute => true
-attribute :output,				:kind_of => Symbol, :equal_to => [:crt, :fullchain], :default => :crt
-
 attribute :key,                 :kind_of => String, :required => true
 
 attribute :owner,               :kind_of => String
 attribute :group,               :kind_of => String
 
-attribute :min_validity,        :kind_of => Integer, :min => 0
-
-attribute :validation_method,   :kind_of => Symbol, :default => :tls_sni01
+attribute :min_validity,        :kind_of => Integer
 
 def webserver(server)
 	sym = server.to_sym.capitalize

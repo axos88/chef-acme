@@ -34,7 +34,7 @@ class Chef
       def load_current_resource
       end
 
-      def check_renewal
+      def check_expiry
         return false if @current_cert.nil?
         @current_cert.not_after >= new_resource.min_expiry
       end
@@ -70,6 +70,22 @@ class Chef
         @current_cert.check_private_key(@current_key)
       end
 
+      def check_issuer
+        return false if @current_cert.nil?
+
+        extensions = @current_cert.extensions || []
+        authority_extension = extensions.find { |x| x.oid == 'authorityInfoAccess' }
+
+        if !!authority_extension
+          data = OpenSSL::ASN1.decode(authority_extension).value[1].value
+          issuer = OpenSSL::ASN1.decode(data).value[1].value[1].value
+
+          issuer == node['acme']['issuer']
+        else
+          false
+        end
+      end
+
       def action_create
         key = acme_ssl_key new_resource.key do
           action :nothing
@@ -83,71 +99,67 @@ class Chef
           @current_cert = ::OpenSSL::X509::Certificate.new ::File.read new_resource.path
         end
 
-        unless (!@current_cert.nil? && check_renewal && check_cn && check_alt_names && check_pkey)
-          ::Chef::Log.info("Renewing ACME certificate for #{@new_resource.cn}: renewal = #{check_renewal}, cn = #{check_cn}, alt_name = #{check_alt_names}, pkey = #{check_pkey}")
-          ::Chef::Log.warn("WARN Renewing ACME certificate for #{@new_resource.cn}: renewal = #{check_renewal}, cn = #{check_cn}, alt_name = #{check_alt_names}, pkey = #{check_pkey}")
+        unless (!@current_cert.nil? && check_expiry && check_cn && check_alt_names && check_pkey && check_issuer)
+          ::Chef::Log.info("Renewing ACME certificate for #{@new_resource.cn}: expiry = #{check_expiry}, cn = #{check_cn}, alt_name = #{check_alt_names}, pkey = #{check_pkey} issuer=#{check_issuer}")
 
           converge_by("Renew ACME certifiacte") do
-            validations = [new_resource.cn, new_resource.alt_names].flatten.compact.uniq.map do |domain|
-              authz = acme_authz_for(domain)
+            domains = [new_resource.cn, new_resource.alt_names].flatten.compact.uniq
 
-              case authz.status
-              when 'valid'
-                ::Chef::Log.info("Authz #{domain} valid")
-                [domain, 'valid']
+            order = acme_client.new_order(identifiers: domains)
 
-              when 'pending'
-                ::Chef::Log.info("Authz #{domain} pending")
-                validation = authz.send(new_resource.validation_method)
+            http_challanges = order.authorizations.map { |a| a.send(validation_method) }
 
-                ::Chef::Log.info("Setting up verification...")
+            pending_challanges = http_challanges.select { |c| c.status == 'pending' }
 
-                compile_and_converge_action { setup_challanges(validation) }
 
-                ::Chef::Log.info("Requesting verification...")
+            pending_challanges.each do |c|
+              ::Chef::Log.info("Challange #{c.to_h} pending")
 
-                validation.request_verification
+              compile_and_converge_action { setup_challanges(c) }
 
-                ::Chef::Log.info("Waiting for verification...")
-
-                times = 60
-
-                while times > 0
-                  break unless validation.verify_status == 'pending'
-                  times -= 1
-                  sleep 1
-                end
-
-                ::Chef::Log.info("Tearing down verification...")
-
-                compile_and_converge_action { teardown_challanges(validation) }
-
-                ::Chef::Log.info("Result: #{validation.status}")
-
-                [domain, validation.status]
-              end
+              ::Chef::Log.info("Requesting verification...")
+              c.request_validation
             end
 
-            failed_validations = validations.reject { |v| v[1] == 'valid' }
+            times = 60
+            while pending_challanges.any? { |c| c.status == 'pending' } && times > 0
+              sleep 1
+              times -= 1
+
+              still_pending = pending_challanges.select { |c| c.status == 'pending' }
+              ::Chef::Log.info("Waiting for verification for #{still_pending.count} challanges...")
+              still_pending.each(&:reload)
+            end
+
+
+            ::Chef::Log.info("Tearing down verification...")
+
+            pending_challanges.each { |c| compile_and_converge_action { teardown_challanges(c) } }
+
+
+            failed_validations = pending_challanges.reject { |c| c.status == 'valid' }
             fail "Validation failed for some domains: #{failed_validations}" unless failed_validations.empty?
 
             begin
-              newcert = acme_cert(new_resource.cn, @current_key, new_resource.alt_names)
+              csr = acme_csr(new_resource.cn, @current_key, new_resource.alt_names)
+              order.finalize(csr: csr)
+
+              times = 60
+              while order.status == 'processing' && times > 0
+                ::Chef::Log.info("Waiting for completion of certificate order...")
+
+                sleep 1
+                times -= 1
+                order.reload
+              end
+
+              fail "Processing order timed out: #{order.status}" unless order.status == 'valid'
             rescue Acme::Client::Error => e
               fail "[#{new_resource.cn}] Certificate request failed: #{e.message}"
             else
 
-              cert_data = case new_resource.output
-              when :fullchain
-                newcert.fullchain_to_pem
-              when :crt
-                newcert.to_pem
-              else
-                fail "Unknown output type: #{new_resource.output}"
-              end
-
               file new_resource.path do
-                content cert_data
+                content order.certificate
 
                 owner new_resource.owner
                 group new_resource.group

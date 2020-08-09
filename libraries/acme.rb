@@ -29,61 +29,27 @@ def acme_client
   return @client if @client
 
   private_key = OpenSSL::PKey::RSA.new(node['acme']['private_key'].nil? ? 2048 : node['acme']['private_key'])
+  kid = !node['acme']['private_key'].nil? && node['acme']['kid']
 
-  @client = Acme::Client.new(private_key: private_key, endpoint: node['acme']['endpoint'])
+  @client = Acme::Client.new(private_key: private_key, directory: "#{node['acme']['endpoint']}/directory", kid: kid)
 
-  if node['acme']['private_key'].nil?
-    registration = acme_client.register(contact: node['acme']['contact'])
-    registration.agree_terms
+  if node['acme']['private_key'].nil? || kid.nil?
+    Chef::Log.warn("Could not find acme account. Registering a new one!")
+
+    kid = acme_client.new_account(contact: node['acme']['contact'], terms_of_service_agreed: true).kid
     node.normal['acme']['private_key'] = private_key.to_pem
+    node.normal['acme']['kid'] = kid
   end
 
   @client
 end
 
-def acme_authz_for(domain)
-  acme_client.authorize(domain: domain)
-end
-
-def acme_validate(authz)
-  authz.request_verification
-
-  times = 60
-
-  while times > 0
-    break unless authz.verify_status == 'pending'
-    times -= 1
-    sleep 1
-  end
-
-  authz
-end
-
-def acme_validate_immediately(authz, method, tokenroot, auth_file)
-  tokenroot.run_action(:create)
-  auth_file.run_action(:create)
-  validate = authz.send(method.to_sym)
-  validate.request_verification
-
-  times = 60
-
-  while times > 0
-    break unless validate.verify_status == 'pending'
-    times -= 1
-    sleep 1
-  end
-
-  validate
-end
-
-def acme_cert(cn, key, alt_names = [])
-  csr = Acme::Client::CertificateRequest.new(
+def acme_csr(cn, key, alt_names = [])
+  Acme::Client::CertificateRequest.new(
     common_name: cn,
-    names: [cn, alt_names].flatten.compact,
+    names: [cn, alt_names].flatten.compact.sort.uniq,
     private_key: key
   )
-
-  acme_client.new_certificate(csr)
 end
 
 def self_signed_cert(cn, alts, key)

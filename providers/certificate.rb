@@ -45,7 +45,7 @@ action :create do
 
   mycert   = nil
   mykey    = OpenSSL::PKey::RSA.new ::File.read new_resource.key
-  renew_at = ::Time.now + 60 * 60 * 24 * node['acme']['renew']
+  renew_at = ::Time.now + 3600 * 24 * node['acme']['renew']
 
   if !new_resource.crt.nil? && ::File.exist?(new_resource.crt)
     mycert   = ::OpenSSL::X509::Certificate.new ::File.read new_resource.crt
@@ -54,43 +54,70 @@ action :create do
   end
 
   if mycert.nil? || mycert.not_after <= renew_at
-    all_validations = [new_resource.cn, new_resource.alt_names].flatten.compact.map do |domain|
-      authz = acme_authz_for domain
+    all_domains = [new_resource.cn, new_resource.alt_names].flatten.compact.uniq
 
-      case authz.status
-      when 'valid'
-        authz.http01
-      when 'pending'
-        tokenpath = "#{new_resource.wwwroot}/#{authz.http01.filename}"
 
-        tokenroot = directory ::File.dirname(tokenpath) do
-          owner     new_resource.owner
-          group     new_resource.group
-          mode      00755
-          recursive true
-        end
 
-        auth_file = file tokenpath do
-          owner   new_resource.owner
-          group   new_resource.group
-          mode    00644
-          content authz.http01.file_content
-        end
-        validation = acme_validate_immediately(authz, 'http01', tokenroot, auth_file)
+    order = acme_client.new_order(identifiers: all_domains)
 
-        if validation.status != 'valid'
-          fail "[#{new_resource.cn}] Validation failed for domain #{authz.domain} with error #{validation.error}"
-        end
 
-        validation
-      end
+    http_challanges = order.authorizations.map { |a| a.http }
+
+    pending_challanges = http_challanges.select { |c| c.status == 'pending' }
+
+    pending_challanges.each do |http_challange|
+      tokenpath = "#{new_resource.wwwroot}/#{http_challange.filename}"
+
+      tokenroot = directory ::File.dirname(tokenpath) do
+        owner     new_resource.owner
+        group     new_resource.group
+        mode      00755
+        recursive true
+      end.run_action(:create_if_missing)
+
+      auth_file = file tokenpath do
+        owner   new_resource.owner
+        group   new_resource.group
+        mode    00644
+        content http_challange.file_content
+      end.run_action(:create_if_missing)
+
+      http_challange.request_validation
     end
+
+    times = 60
+    while pending_challanges.any? { |c| c.status == 'pending' } && times > 0
+      still_pending = pending_challanges.select { |c| c.status == 'pending' }
+
+      ::Chef::Log.info("Waiting for verification for #{still_pending.count} challanges...")
+
+      sleep 1
+      times -= 1
+      still_pending.each(&:reload)
+    end
+
+    pending_challanges.each do |http_challange|
+      tokenpath = "#{new_resource.wwwroot}/#{http_challange.filename}"
+
+      file tokenpath do
+      end.run_action(:delete)
+    end    
 
     ruby_block "refresh certificate for #{new_resource.cn}" do
       block do
-        if (all_validations.map { |authz| authz.status == 'valid' }).all?
+        if (http_challanges.all? { |c| c.status == 'valid' })
           begin
-            newcert = acme_cert(new_resource.cn, mykey, new_resource.alt_names)
+            csr = acme_csr(new_resource.cn, mykey, new_resource.alt_names)
+            order.finalize(csr: csr)
+
+            times = 60
+            while order.status == 'processing' && times > 0 do
+              sleep 1
+              times -= 1
+              order.reload
+            end            
+
+            newcert = order.certificate
           rescue Acme::Client::Error => e
             fail "[#{new_resource.cn}] Certificate request failed: #{e.message}"
           else
@@ -98,7 +125,7 @@ action :create do
               f.path    new_resource.crt || new_resource.fullchain
               f.owner   new_resource.owner
               f.group   new_resource.group
-              f.content new_resource.crt.nil? ? newcert.fullchain_to_pem : newcert.to_pem
+              f.content new_resource.crt.nil? ? newcert : newcert
               f.mode    00644
             end.run_action :create
 
@@ -114,7 +141,7 @@ action :create do
             end
           end
         else
-          fail "[#{new_resource.cn}] Validation failed, unable to request certificate"
+          fail "[#{new_resource.cn}] Validation failed, unable to request certificate: #{pending_challanges}"
         end
       end
     end
