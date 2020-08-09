@@ -19,7 +19,7 @@
 #
 
 # :staging or :prod
-env = :staging
+env = :prod
 
 default['acme']['contact']     = []
 
