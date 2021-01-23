@@ -26,12 +26,12 @@ end
 
 def acme_client
   Chef::Application.fatal!('Acme requires that a contact is specified') if node['acme']['contact'].empty?
-  return @client if @client
+  return @acme_client if @acme_client
 
   private_key = OpenSSL::PKey::RSA.new(node['acme']['private_key'].nil? ? 2048 : node['acme']['private_key'])
   kid = !node['acme']['private_key'].nil? && node['acme']['kid']
 
-  @client = Acme::Client.new(private_key: private_key, directory: "#{node['acme']['endpoint']}/directory", kid: kid)
+  @acme_client = Acme::Client.new(private_key: private_key, directory: "#{node['acme']['endpoint']}/directory", kid: kid)
 
   if node['acme']['private_key'].nil? || kid.nil?
     Chef::Log.warn("Could not find acme account. Registering a new one!")
@@ -41,7 +41,7 @@ def acme_client
     node.normal['acme']['kid'] = kid
   end
 
-  @client
+  @acme_client
 end
 
 def acme_csr(cn, key, alt_names = [])
