@@ -131,8 +131,8 @@ class Chef
             pending_authorizations.each { |c| compile_and_converge_action { teardown_challenge(c) } }
 
 
-            failed_validations = pending_authorizations.reject { |c| c.status == 'valid' }
-            fail "Validation failed for some domains: #{failed_validations}" unless failed_validations.empty?
+            failed_authorizations = pending_authorizations.reject { |a| a.status == 'valid' }
+            fail "Validation failed for some domains: #{failed_authorizations.map {|a| a.to_h }}" unless failed_authorizations.empty?
 
             begin
               csr = acme_csr(new_resource.cn, @current_key, new_resource.alt_names)
