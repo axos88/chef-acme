@@ -4,11 +4,6 @@ class Chef
   class Provider
     class SSLCertificate
       class Nginx < ::Chef::Provider::SSLCertificate
-
-        def validation_method
-          :http
-        end
-
         def basedir
           '/var/www/acme'
         end
@@ -23,26 +18,32 @@ class Chef
           end
         end
 
-        attr_reader :nginx
+        def setup_challenge(authorization)
+          challenge = authorization.http
 
-        def setup_challanges(http_challange)
-          directory ::File.dirname(::File.join(basedir, http_challange.filename)) do
+          directory ::File.dirname(::File.join(basedir, challenge.filename)) do
             owner     node[:nginx][:user]
             group     node[:nginx][:user]
             mode      00755
             recursive true
           end
 
-          file ::File.join(basedir, http_challange.filename) do
-            content http_challange.file_content
+          file ::File.join(basedir, challenge.filename) do
+            content challenge.file_content
 
             mode 00644
             owner node[:nginx][:user]
           end
         end
 
-        def teardown_challanges(http_challange)
-          file ::File.join(basedir, http_challange.filename) do
+        def validate_challenge(authorization)
+          authorization.http.request_validation
+        end
+
+        def teardown_challenge(authorization)
+          challenge = authorization.http
+
+          file ::File.join(basedir, challenge.filename) do
             action :delete
           end
         end

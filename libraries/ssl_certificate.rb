@@ -23,8 +23,6 @@ class Chef
   class Provider
     class SSLCertificate < Chef::Provider::LWRPBase
 
-      attr_reader :challanges
-
       use_inline_resources
 
       def whyrun_supported?
@@ -107,37 +105,33 @@ class Chef
 
             order = acme_client.new_order(identifiers: domains)
 
-            http_challanges = order.authorizations.map { |a| a.send(validation_method) }
+            pending_authorizations = order.authorizations.select { |a| a.status == 'pending' }
 
-            pending_challanges = http_challanges.select { |c| c.status == 'pending' }
+            pending_authorizations.each do |a|
+              ::Chef::Log.info("Authorization #{a.to_h} pending")
 
-
-            pending_challanges.each do |c|
-              ::Chef::Log.info("Challange #{c.to_h} pending")
-
-              compile_and_converge_action { setup_challanges(c) }
+              compile_and_converge_action { setup_challenge(a) }
 
               ::Chef::Log.info("Requesting verification...")
-              c.request_validation
+              validate_challenge(a)
             end
 
             times = 60
-            while pending_challanges.any? { |c| c.status == 'pending' } && times > 0
+            while pending_authorizations.any? { |a| a.status == 'pending' } && times > 0
               sleep 1
               times -= 1
 
-              still_pending = pending_challanges.select { |c| c.status == 'pending' }
-              ::Chef::Log.info("Waiting for verification for #{still_pending.count} challanges...")
+              still_pending = pending_authorizations.select { |a| a.status == 'pending' }
+              ::Chef::Log.info("Waiting for verification for #{still_pending.count} challenges...")
               still_pending.each(&:reload)
             end
 
-
             ::Chef::Log.info("Tearing down verification...")
 
-            pending_challanges.each { |c| compile_and_converge_action { teardown_challanges(c) } }
+            pending_authorizations.each { |c| compile_and_converge_action { teardown_challenge(c) } }
 
 
-            failed_validations = pending_challanges.reject { |c| c.status == 'valid' }
+            failed_validations = pending_authorizations.reject { |c| c.status == 'valid' }
             fail "Validation failed for some domains: #{failed_validations}" unless failed_validations.empty?
 
             begin
