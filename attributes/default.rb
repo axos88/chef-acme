@@ -24,6 +24,7 @@ env = :prod
 default['acme']['contact']     = []
 
 if env == :staging
+  Chef::Log.warn("Using staging ACME endpoint. Issued certificates will NOT be valid!")
   default['acme']['endpoint']  = 'https://acme-staging-v02.api.letsencrypt.org'
   default['acme']['issuer']    = 'http://cert.stg-int-x1.letsencrypt.org/'
 elsif env == :prod
