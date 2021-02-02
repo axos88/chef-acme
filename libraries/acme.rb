@@ -29,7 +29,8 @@ def acme_client
   return @acme_client if @acme_client
 
   private_key = OpenSSL::PKey::RSA.new(node['acme']['private_key'].nil? ? 2048 : node['acme']['private_key'])
-  kid = !node['acme']['private_key'].nil? && node['acme']['kid']
+
+  kid = node['acme']['private_key'] && node['acme']['kid'] && node['acme']['kid'][node['acme']['endpoint']]
 
   @acme_client = Acme::Client.new(private_key: private_key, directory: "#{node['acme']['endpoint']}/directory", kid: kid)
 
@@ -38,7 +39,8 @@ def acme_client
 
     kid = acme_client.new_account(contact: node['acme']['contact'], terms_of_service_agreed: true).kid
     node.normal['acme']['private_key'] = private_key.to_pem
-    node.normal['acme']['kid'] = kid
+    node.normal['acme']['kid'] ||= {}
+    node.normal['acme']['kid'][node['acme']['endpoint']] = kid
     node.save
   end
 
