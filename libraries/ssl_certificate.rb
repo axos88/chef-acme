@@ -118,14 +118,11 @@ class Chef
               validate_challenge(a)
             end
 
-            times = 60
-            while pending_authorizations.any? { |a| a.status == 'pending' } && times > 0
-              sleep 1
-              times -= 1
-
+            retry_times("Waiting to validate authorizations...", 60) do
               still_pending = pending_authorizations.select { |a| a.status == 'pending' }
-              ::Chef::Log.info("Waiting for verification for #{still_pending.count} challenges...")
               still_pending.each(&:reload)
+
+              raise "#{still_pending.count} challenges still pending..." unless still_pending.empty?
             end
 
             ::Chef::Log.info("Tearing down verification...")
@@ -140,13 +137,9 @@ class Chef
               csr = acme_csr(new_resource.cn, @current_key, new_resource.alt_names)
               order.finalize(csr: csr)
 
-              times = 60
-              while order.status == 'processing' && times > 0
-                ::Chef::Log.info("Waiting for completion of certificate order...")
-
-                sleep 1
-                times -= 1
+              retry_times("Waiting for completion of certificate order...", 60) do
                 order.reload
+                raise "Order still processing..." if order.status == 'processing'
               end
 
               fail "Processing order timed out: #{order.status}" unless order.status == 'valid'
@@ -163,6 +156,21 @@ class Chef
               end.run_action(:create)
             end
           end
+        end
+      end
+
+      private def retry_times(name, times, delay = 1)
+        count = 1
+
+        begin
+          yield
+        rescue => e
+          Chef::Log.warn("Error #{count}/#{times} while trying #{name}: #{e.message}")
+
+          count += 1
+          sleep delay
+          raise "Timed out retrying #{name}" unless count < times
+          retry
         end
       end
     end
