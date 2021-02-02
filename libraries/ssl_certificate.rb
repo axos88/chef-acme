@@ -142,11 +142,10 @@ class Chef
                 raise "Order still processing..." if order.status == 'processing'
               end
 
-              fail "Processing order timed out: #{order.status}" unless order.status == 'valid'
+              fail "Processing order failed: #{order.status}" unless order.status == 'valid'
             rescue Acme::Client::Error => e
               fail "[#{new_resource.cn}] Certificate request failed: #{e.message}"
             else
-
               file new_resource.path do
                 content order.certificate
 
