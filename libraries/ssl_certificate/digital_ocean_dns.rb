@@ -45,14 +45,32 @@ class Chef
           @records[authorization] = { for_domain: domain, id: r.id }
         end
 
+        private def txt_records(ns, fqdn)
+          resolver = Resolv::DNS.new(nameserver: ns)
+          resolver.getresources(fqdn, Resolv::DNS::Resource::IN::TXT).map(&:strings).flatten
+        end
+
+        private def validate_ns_records(ns, fqdn, value)
+            records = txt_records(ns, fqdn)
+            raise "#{fqdn} TXT records on #{ns} do not contain #{value}, only #{records}" unless records.find { |r| r == value }
+        end
+
         def validate_challenge(authorization)
-          authorization.dns.request_validation
+          challenge = authorization.dns
+          fqdn = [challenge.record_name, authorization.domain].join('.')
+          value = challenge.record_content
+
+          retry_times("Waiting for DNS propagation...", 60) do
+            validate_ns_records('ns1.digitalocean.com', fqdn, value)
+            validate_ns_records('ns2.digitalocean.com', fqdn, value)
+            validate_ns_records('ns3.digitalocean.com', fqdn, value)
+          end
+
+          challenge.request_validation
         end
 
         def teardown_challenge(authorization)
           Chef::Log.info("Tearing down challenge DNS record: #{@records[authorization].inspect}")
-
-
           client.domain_records.delete(@records.delete(authorization))
         end
       end
