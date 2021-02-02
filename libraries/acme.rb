@@ -39,6 +39,7 @@ def acme_client
     kid = acme_client.new_account(contact: node['acme']['contact'], terms_of_service_agreed: true).kid
     node.normal['acme']['private_key'] = private_key.to_pem
     node.normal['acme']['kid'] = kid
+    node.save
   end
 
   @acme_client
