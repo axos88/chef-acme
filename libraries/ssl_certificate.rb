@@ -78,6 +78,8 @@ class Chef
           data = OpenSSL::ASN1.decode(authority_extension).value[1].value
           issuer = OpenSSL::ASN1.decode(data).value[1].value[1].value
 
+          Chef::Log.info("Current issuer is: #{issuer}. Expected: #{node['acme']['issuer']}") unless issuer == node['acme']['issuer']
+
           issuer == node['acme']['issuer']
         else
           false
