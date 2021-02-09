@@ -21,16 +21,17 @@
 actions :create
 default_action :create
 
-attribute :cn,                  :kind_of => String, :required => true
-attribute :alt_names,           :kind_of => Array,  :default => []
+attribute :cn,                    :kind_of => String, :required => true
+attribute :alt_names,             :kind_of => Array,  :default => []
 
-attribute :path,                :kind_of => String, :name_attribute => true
-attribute :key,                 :kind_of => String, :required => true
+attribute :path,                  :kind_of => String, :name_attribute => true
+attribute :key,                   :kind_of => String, :required => true
 
-attribute :owner,               :kind_of => String
-attribute :group,               :kind_of => String
+attribute :owner,                 :kind_of => String
+attribute :group,                 :kind_of => String
 
-attribute :min_validity,        :kind_of => Integer
+attribute :min_validity,          :kind_of => Integer
+attribute :allow_extra_alt_names, :kind_of => [TrueClass, FalseClass], :default => false
 
 def webserver(server)
 	sym = server.to_sym.capitalize

@@ -32,14 +32,21 @@ class Chef
       def load_current_resource
       end
 
+      def assert(check, msg)
+        check.tap do |c|
+          Chef::Log.warn("Check failed: #{msg}") unless c
+        end
+      end
+
+      def check_exists
+        assert(@current_cert, "No certificate stored on the system")        
+      end
+
       def check_expiry
-        return false if @current_cert.nil?
-        @current_cert.not_after >= new_resource.min_expiry
+        assert(@current_cert.not_after >= new_resource.min_expiry, "#{@current_cert.not_after} >= #{new_resource.min_expiry}")        
       end
 
       def check_alt_names
-        return false if @current_cert.nil?
-
         extensions = @current_cert.extensions || []
         alt_extension = extensions.find { |x| x.oid == 'subjectAltName' }
 
@@ -53,19 +60,28 @@ class Chef
         #We ignore if the cn is among the subjectAltNames in one or the other certificate.
         current_cn = @current_cert.subject.to_a.map { |x| x[1] if x[0] == 'CN' }
 
-        (current_alt_names | [current_cn]).flatten.compact.sort.uniq == (new_resource.alt_names | [new_resource.cn]).flatten.compact.sort.uniq
+        current_names = (current_alt_names | [current_cn]).flatten.compact.sort.uniq
+        desired_names = (new_resource.alt_names | [new_resource.cn]).flatten.compact.sort.uniq
+
+        if new_resource.allow_extra_alt_names
+          assert(desired_names - current_names == [], "#{desired_names} - #{current_names} == []")
+        else
+          assert(current_names == desired_names, "#{current_names} == #{desired_names}")
+        end
+
       end
 
       def check_cn
         return false if @current_cert.nil?
 
-        @current_cert.subject.to_a.map { |x| x[1] if x[0] == 'CN' }.compact.include?(new_resource.cn)
+        current_cns = @current_cert.subject.to_a.map { |x| x[1] if x[0] == 'CN' }.compact
+        assert(current_cns.include?(new_resource.cn), "#{current_cns} includes #{new_resource.cn}")
       end
 
       def check_pkey
         return false if @current_cert.nil?
 
-        @current_cert.check_private_key(@current_key)
+        assert(@current_cert.check_private_key(@current_key), "fails privat key check")
       end
 
       def check_issuer
@@ -80,9 +96,9 @@ class Chef
 
           Chef::Log.info("Current issuer is: #{issuer}. Expected: #{node['acme']['issuer']}") unless issuer == node['acme']['issuer']
 
-          issuer == node['acme']['issuer']
+          assert(issuer == node['acme']['issuer'], "#{issuer} == #{node['acme']['issuer']}")
         else
-          false
+          assert(false, "can't extract issuer")
         end
       end
 
@@ -99,8 +115,8 @@ class Chef
           @current_cert = ::OpenSSL::X509::Certificate.new ::File.read new_resource.path
         end
 
-        unless (!@current_cert.nil? && check_expiry && check_cn && check_alt_names && check_pkey && check_issuer)
-          ::Chef::Log.info("Renewing ACME certificate for #{@new_resource.cn}: expiry = #{check_expiry}, cn = #{check_cn}, alt_name = #{check_alt_names}, pkey = #{check_pkey} issuer=#{check_issuer}")
+        unless (check_exists && check_expiry && check_cn && check_alt_names && check_pkey && check_issuer)
+          ::Chef::Log.info("Renewing ACME certificate for #{@new_resource.cn}")
 
           converge_by("Renew ACME certifiacte") do
             domains = [new_resource.cn, new_resource.alt_names].flatten.compact.uniq
