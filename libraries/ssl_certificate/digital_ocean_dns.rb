@@ -12,7 +12,7 @@ class Chef
 
           require 'droplet_kit'
 
-          token = Chef::EncryptedDataBagItem.load("encrypted", "digitalocean_token")['token']
+          token = Chef::EncryptedDataBagItem.load("encrypted", "digitalocean_token")['data']
 
           @client = DropletKit::Client.new(access_token: token)
           @records = {}
