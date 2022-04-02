@@ -175,16 +175,16 @@ class Chef
       end
 
       private def retry_times(name, time, delay = 5)
-        count = 1
+        count = 0
 
         begin
           yield
         rescue => e
-          Chef::Log.warn("Error #{count}/#{times} while trying #{name}: #{e.message}")
+          Chef::Log.warn("Error #{count/delay}/#{time/delay} while trying #{name}: #{e.message}")
 
           count += delay
           sleep delay
-          raise "Timed out retrying #{name}" unless count < times
+          raise "Timed out retrying #{name}" unless count <= times
           retry
         end
       end
