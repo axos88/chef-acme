@@ -184,7 +184,7 @@ class Chef
 
           count += delay
           sleep delay
-          raise "Timed out retrying #{name}" unless count <= times
+          raise "Timed out retrying #{name}" unless count <= time
           retry
         end
       end
