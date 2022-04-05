@@ -62,10 +62,17 @@ class Chef
           fqdn = [challenge.record_name, authorization.domain].join('.')
           value = challenge.record_content
 
+
+          dns_servers_pending_propagation = node['acme']['dns_servers'].map { |s| [ "#{s['provider']} - #{s['location']}", s['address']] }
+
           retry_times("Waiting for DNS propagation...", 60) do
-            validate_ns_records('ns1.digitalocean.com', fqdn, value)
-            validate_ns_records('ns2.digitalocean.com', fqdn, value)
-            validate_ns_records('ns3.digitalocean.com', fqdn, value)
+            until dns_servers_pending_propagation.empty? do
+              nm, address = dns_servers_pending_propagation.first
+              Chef::Log.debug("Checking DNS propagation to #{nm} at #{address}")
+              validate_ns_records(server, fqdn, value)
+              Chef::Log.info("DNS propagation to #{nm} at #{address} successful")
+              dns_servers_pending_propagation.shift
+            end
           end
 
           challenge.request_validation
