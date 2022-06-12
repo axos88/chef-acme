@@ -63,7 +63,7 @@ default['acme']['dns_servers'] = [
 { lat: 55, lng: -1, location: "Guisborough, United Kingdom", flag: "gb", provider: "Onyx Internet Ltd", address: "195.97.240.237" },
 { lat: 55.6666, lng: 12.4, location: "Glostrup, Denmark", flag: "dk", provider: "Sentia Denmark A/S", address: "86.58.175.11" },
 { lat: 49.5064, lng: 8.2118, location: "Frankfurt am Main, Germany", flag: "de", provider: "DNS.WATCH", address: "84.200.70.40" },
-{ lat: 25.65, lng: -100.083, location: "Juarez, Mexico", flag: "mx", provider: "IP Matrix S.A. de C.V.", address: "201.174.34.194" },
+#{ lat: 25.65, lng: -100.083, location: "Juarez, Mexico", flag: "mx", provider: "IP Matrix S.A. de C.V.", address: "201.174.34.194" },
 { lat: -29.7175, lng: -52.4258, location: "Santa Cruz do Sul, Brazil", flag: "br", provider: "Claro S.A", address: "200.248.178.54" },
 { lat: 3.1412, lng: 101.687, location: "Kuala Lumpur, Malaysia", flag: "my", provider: "Ohana Communications Sdn Bhd", address: "103.26.250.4" },
 { lat: -38, lng: 145, location: "Research, Australia", flag: "au", provider: "Cloudflare Inc", address: "1.1.1.1" },
