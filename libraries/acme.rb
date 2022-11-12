@@ -32,7 +32,7 @@ def acme_client
 
   kid = node['acme']['private_key'] && node['acme']['kid'] && node['acme']['kid'][node['acme']['endpoint']]
 
-  @acme_client = Acme::Client.new(private_key: private_key, directory: "#{node['acme']['endpoint']}/directory", kid: kid)
+  @acme_client = Acme::Client.new(private_key: private_key, directory: "#{node['acme']['endpoint']}/directory", kid: kid, bad_nonce_retry: 5)
 
   if node['acme']['private_key'].nil? || kid.nil?
     Chef::Log.warn("Could not find acme account. Registering a new one!")

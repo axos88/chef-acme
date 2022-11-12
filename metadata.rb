@@ -11,4 +11,4 @@ chef_version     '>= 12.1' if respond_to?(:chef_version)
 
 depends 'compat_resource', '>= 12.19'
 
-gem 'acme-client', '2.0.6'
+gem 'acme-client', '2.0.11'
