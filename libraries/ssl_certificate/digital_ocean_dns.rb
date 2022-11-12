@@ -49,6 +49,7 @@ class Chef
 
         private def txt_records(ns, fqdn)
           resolver = Resolv::DNS.new(nameserver: ns)
+          resolver.timeouts = 2
           resolver.getresources(fqdn, Resolv::DNS::Resource::IN::TXT).map(&:strings).flatten
         end
 
