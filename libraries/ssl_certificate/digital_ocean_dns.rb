@@ -69,15 +69,20 @@ class Chef
           begin
             retry_times("Waiting for DNS propagation...", 60) do
               until dns_servers_pending_propagation.empty? do
-                nm, address = dns_servers_pending_propagation.first
-                Chef::Log.debug("Checking DNS propagation to #{nm} at #{address}")
-                validate_ns_records(address, fqdn, value)
-                Chef::Log.info("DNS propagation to #{nm} at #{address} successful")
-                dns_servers_pending_propagation.shift
+                begin
+                  nm, address = dns_servers_pending_propagation.first
+                  Chef::Log.debug("Checking DNS propagation to #{nm} at #{address}")
+                  validate_ns_records(address, fqdn, value)
+                  Chef::Log.info("DNS propagation to #{nm} at #{address} successful")
+                  dns_servers_pending_propagation.shift
+                rescue
+                  dns_servers_pending_propagation.push(dns_servers_pending_propagation.shift)
+                  raise
+                end
               end
             end
           rescue => e
-            Chef::Log.warn("#{e.message} Trying validation anyway.")
+            Chef::Log.warn("#{dns_servers_pending_propagation.inspect} did not propagate. Trying validation anyway.")
           end
 
           challenge.request_validation
