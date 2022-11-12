@@ -48,7 +48,7 @@ default['acme']['dns_servers'] = [
 { lat: 38, lng: -122, location: "Holtsville NY, United States", flag: "us", provider: "OpenDNS", address: "208.67.222.220" },
 { lat: 37.4059, lng: -122.078, location: "Mountain View CA, United States", flag: "us", provider: "Google", address: "8.8.8.8" },
 { lat: 37.8793, lng: -122.265, location: "Berkeley, US", flag: "us", provider: "Quad9", address: "9.9.9.9" },
-{ lat: 40.7142, lng: -74.0059, location: "Brooklyn, United States", flag: "us", provider: "Verizon Fios Business", address: "98.113.146.9" },
+#{ lat: 40.7142, lng: -74.0059, location: "Brooklyn, United States", flag: "us", provider: "Verizon Fios Business", address: "98.113.146.9" },
 { lat: 26, lng: -80, location: "Miami, United States", flag: "us", provider: "AT&amp;T Services", address: "12.121.117.201" },
 { lat: 38.9977, lng: -77.4331, location: "Ashburn, United States", flag: "us", provider: "NeuStar", address: "156.154.70.64" },
 { lat: 37.2799, lng: -121.956, location: "San Jose, United States", flag: "us", provider: "Corporate West Computer Systems", address: "66.206.166.2" },
