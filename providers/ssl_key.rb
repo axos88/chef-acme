@@ -6,8 +6,8 @@ def do_action(file_action)
   data = key.send("to_#{new_resource.output_format}".to_sym)
 
   file new_resource.path do
-    owner     owner
-    group     group
+    owner     new_resource.owner
+    group     new_resource.group
     mode      00400
     content   data
     sensitive true

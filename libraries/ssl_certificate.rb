@@ -105,6 +105,9 @@ class Chef
       def action_create
         key = acme_ssl_key new_resource.key do
           action :nothing
+
+          owner new_resource.owner
+          group new_resource.group
         end
 
         key.run_action(:create_if_missing)
