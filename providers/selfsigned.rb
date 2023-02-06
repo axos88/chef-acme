@@ -23,8 +23,8 @@ use_inline_resources
 action :create do
   file "#{new_resource.cn} SSL selfsigned key" do
     path      new_resource.key
-    owner     new_resource.owner
-    group     new_resource.group
+    owner     new_resource.key_owner
+    group     new_resource.key_group
     mode      00400
     content   OpenSSL::PKey::RSA.new(new_resource.key_size).to_pem
     sensitive true
