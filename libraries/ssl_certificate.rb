@@ -94,9 +94,11 @@ class Chef
           data = OpenSSL::ASN1.decode(authority_extension).value[1].value
           issuer = OpenSSL::ASN1.decode(data).value[1].value[1].value
 
-          Chef::Log.info("Current issuer is: #{issuer}. Expected: #{node['acme']['issuer']}") unless issuer == node['acme']['issuer']
+          result = ::File.fnmatch(node['acme']['issuer'], issuer)
 
-          assert(issuer == node['acme']['issuer'], "#{issuer} == #{node['acme']['issuer']}")
+          Chef::Log.info("Current issuer is: #{issuer}. Expected: #{node['acme']['issuer']}") unless result
+
+          assert(result, "#{issuer} ~= #{node['acme']['issuer']}")
         else
           assert(false, "can't extract issuer")
         end

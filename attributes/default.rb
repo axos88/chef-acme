@@ -29,7 +29,7 @@ if env == :staging
   default['acme']['issuer']    = 'http://cert.stg-int-x1.letsencrypt.org/'
 elsif env == :prod
   default['acme']['endpoint']  = 'https://acme-v02.api.letsencrypt.org'
-  default['acme']['issuer']    = 'http://r3.i.lencr.org/'
+  default['acme']['issuer']    = 'http://*.i.lencr.org/'
 else
   fail "Unknown acme environment: #{env}. Should be :staging or :prod"
 end
