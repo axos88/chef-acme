@@ -29,11 +29,11 @@ attribute :key,           :kind_of => String, :default => nil,   :required => tr
 
 attribute :chain,         :kind_of => String, :default => nil
 
-attribute :owner,         :kind_of => String, :default => 'root'
-attribute :group,         :kind_of => String, :default => 'root'
+attribute :owner,         :kind_of => [Integer, String], :default => 'root'
+attribute :group,         :kind_of => [Integer, String], :default => 'root'
 
-attribute :key_owner,     :kind_of => String, default: 'root'
-attribute :key_group,     :kind_of => String, default: 'root'
+attribute :key_owner,     :kind_of => [Integer, String], default: 'root'
+attribute :key_group,     :kind_of => [Integer, String], default: 'root'
 
 attribute :key_size,      :kind_of  => Integer,
                           :default  => node['acme']['key_size'],

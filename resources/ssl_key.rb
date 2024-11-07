@@ -6,8 +6,8 @@ property :length,				Integer, :default => 2048
 property :output_format,        Symbol,  :equal_to => [:pem, :der, :text], :default => :pem
 property :type,					Symbol,  :equal_to => [:rsa, :dsa], :default => :rsa
 
-attribute :owner,               String, :default => 'root'
-attribute :group,               String, :default => 'root'
+attribute :owner,               [Integer, String], :default => 'root'
+attribute :group,               [Integer, String], :default => 'root'
 
 def load
   klass = OpenSSL::PKey.const_get(type.upcase)

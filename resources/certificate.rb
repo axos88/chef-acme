@@ -30,8 +30,8 @@ attribute :key,           :kind_of => String, :default => nil
 attribute :chain,         :kind_of => String, :default => nil
 attribute :fullchain,     :kind_of => String, :default => nil
 
-attribute :owner,         :kind_of => String, :default => 'root'
-attribute :group,         :kind_of => String, :default => 'root'
+attribute :owner,         :kind_of => [Integer, String], :default => 'root'
+attribute :group,         :kind_of => [Integer, String], :default => 'root'
 
 attribute :wwwroot,       :kind_of => String, :default => '/var/www'
 
