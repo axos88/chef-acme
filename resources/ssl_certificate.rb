@@ -44,7 +44,9 @@ def webserver(server)
 end
 
 def min_expiry
-	Time.now + 3600 * 24 * (@min_validity || node[:acme][:renew])
+	distribution = rand * 0.25 + 1.0
+
+	@min_expiry = Time.now + (distribution * 3600 * 24 * (@min_validity || node[:acme][:renew])).to_i
 end
 
 def after_created
