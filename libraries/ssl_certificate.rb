@@ -92,7 +92,7 @@ class Chef
 
         if !!authority_extension
           data = OpenSSL::ASN1.decode(authority_extension).value[1].value
-          issuer = OpenSSL::ASN1.decode(data).value[1].value[1].value
+          issuer = OpenSSL::ASN1.decode(data).find { |v| v.value[0].value == 'caIssuers' }.value[1].value
 
           result = ::File.fnmatch(node['acme']['issuer'], issuer)
 
